@@ -531,6 +531,78 @@ async def pagos_pendientes_por_mes(
     
     return resultado
 
+@app.get("/api/pagos/enriquecidos")
+async def listar_pagos_enriquecidos(
+    contrato_id: Optional[str] = Query(None),
+    tipo: Optional[str] = Query(None),
+    estado: Optional[str] = Query(None),
+    mes_anio: Optional[str] = Query(None),
+    piso_id: Optional[str] = Query(None),
+    habitacion_id: Optional[str] = Query(None),
+    inquilino_id: Optional[str] = Query(None),
+    usuario_actual: dict = Depends(obtener_usuario_actual)
+):
+    """Lista todos los pagos con información enriquecida y filtros avanzados"""
+    # Construir filtro de pagos
+    filtro_pagos = {}
+    if contrato_id:
+        filtro_pagos["contrato_id"] = contrato_id
+    if tipo:
+        filtro_pagos["tipo"] = tipo
+    if estado:
+        filtro_pagos["estado"] = estado
+    if mes_anio:
+        filtro_pagos["mes_anio"] = mes_anio
+    
+    pagos = await pagos_collection.find(filtro_pagos).to_list(1000)
+    
+    # Enriquecer con datos relacionados
+    resultado = []
+    for pago in pagos:
+        contrato = await contratos_collection.find_one({"_id": pago["contrato_id"]})
+        if not contrato:
+            continue
+            
+        # Aplicar filtros de relaciones
+        if inquilino_id and contrato["inquilino_id"] != inquilino_id:
+            continue
+            
+        habitacion = await habitaciones_collection.find_one({"_id": contrato["habitacion_id"]})
+        if not habitacion:
+            continue
+            
+        if habitacion_id and habitacion["_id"] != habitacion_id:
+            continue
+            
+        piso = await pisos_collection.find_one({"_id": habitacion["piso_id"]})
+        if piso_id and piso and piso["_id"] != piso_id:
+            continue
+            
+        inquilino = await inquilinos_collection.find_one({"_id": contrato["inquilino_id"]})
+        
+        # Obtener nombres de usuarios para trazabilidad
+        creado_por = None
+        if pago.get("creado_por_usuario_id"):
+            usuario_creador = await usuarios_collection.find_one({"_id": pago["creado_por_usuario_id"]}, {"_id": 0, "nombre": 1})
+            creado_por = usuario_creador["nombre"] if usuario_creador else None
+        
+        revisado_por = None
+        if pago.get("revisado_por_usuario_id"):
+            usuario_revisor = await usuarios_collection.find_one({"_id": pago["revisado_por_usuario_id"]}, {"_id": 0, "nombre": 1})
+            revisado_por = usuario_revisor["nombre"] if usuario_revisor else None
+        
+        resultado.append({
+            "pago": pago,
+            "contrato": contrato,
+            "habitacion": habitacion,
+            "piso": piso,
+            "inquilino": inquilino,
+            "creado_por_nombre": creado_por,
+            "revisado_por_nombre": revisado_por
+        })
+    
+    return resultado
+
 # ============= GASTOS =============
 @app.get("/api/gastos", response_model=List[Gasto])
 async def listar_gastos(
