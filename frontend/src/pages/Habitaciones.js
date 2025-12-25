@@ -45,7 +45,7 @@ const Habitaciones = () => {
 
   const cargarHabitaciones = async () => {
     try {
-      const url = pisoSeleccionado ? `${API}/habitaciones?piso_id=${pisoSeleccionado}` : `${API}/habitaciones`;
+      const url = pisoSeleccionado && pisoSeleccionado !== 'all' ? `${API}/habitaciones?piso_id=${pisoSeleccionado}` : `${API}/habitaciones`;
       const response = await axios.get(url);
       setHabitaciones(response.data);
     } catch (error) {
