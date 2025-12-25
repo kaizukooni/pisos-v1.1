@@ -612,7 +612,7 @@ const Pagos = () => {
                     {pagoDetalle.pago.revisado_por_usuario_id && (
                       <div>
                         <Label className="text-xs text-gray-600">Confirmado por</Label>
-                        <p className="font-medium">{pagoDetalle.revisado_por_nombre}</p>
+                        <p className="font-medium">{pagoDetalle.revisado_por_nombre || 'N/A'}</p>
                         {pagoDetalle.pago.fecha_ultima_actualizacion && (
                           <p className="text-xs text-gray-500">
                             {format(new Date(pagoDetalle.pago.fecha_ultima_actualizacion), 'dd/MM/yyyy HH:mm', { locale: es })}
