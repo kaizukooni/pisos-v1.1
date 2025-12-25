@@ -209,7 +209,7 @@ const Pisos = () => {
     } else {
       setHabitacionEditar(null);
       setFormHabitacion({
-        piso_id: pisoDetalle?.piso?.id || '',
+        piso_id: pisoDetalle?.piso?._id || '',
         nombre: '',
         metros: '',
         precio_base: ''
