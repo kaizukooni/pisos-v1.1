@@ -161,7 +161,7 @@ class Pago(PagoBase):
     id: str = Field(alias="_id")
     creado_por_usuario_id: str
     revisado_por_usuario_id: Optional[str] = None
-    fecha_creacion: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    fecha_creacion: Optional[datetime] = None
     fecha_ultima_actualizacion: Optional[datetime] = None
 
 # Gasto
