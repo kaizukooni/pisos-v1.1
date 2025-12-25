@@ -57,8 +57,8 @@ const Pagos = () => {
   const cargarPagos = async () => {
     try {
       let url = `${API}/pagos?`;
-      if (filtros.estado) url += `estado=${filtros.estado}&`;
-      if (filtros.tipo) url += `tipo=${filtros.tipo}&`;
+      if (filtros.estado && filtros.estado !== 'all') url += `estado=${filtros.estado}&`;
+      if (filtros.tipo && filtros.tipo !== 'all') url += `tipo=${filtros.tipo}&`;
       if (filtros.mes_anio) url += `mes_anio=${filtros.mes_anio}&`;
       
       const response = await axios.get(url);
