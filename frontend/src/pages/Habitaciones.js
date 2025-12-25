@@ -7,9 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
-import { Plus, Edit, Trash2 } from 'lucide-react';
+import { Plus, Edit, Trash2, Eye } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
 
@@ -17,39 +20,57 @@ const Habitaciones = () => {
   const { usuario } = useAuth();
   const [habitaciones, setHabitaciones] = useState([]);
   const [pisos, setPisos] = useState([]);
-  const [pisoSeleccionado, setPisoSeleccionado] = useState('all');
   const [dialogAbierto, setDialogAbierto] = useState(false);
+  const [dialogDetalle, setDialogDetalle] = useState(false);
   const [habitacionEditar, setHabitacionEditar] = useState(null);
+  const [habitacionDetalle, setHabitacionDetalle] = useState(null);
   const [cargando, setCargando] = useState(false);
   
   const [formData, setFormData] = useState({
     piso_id: '',
     nombre: '',
-    metros: '',
     precio_base: ''
   });
 
   useEffect(() => {
-    cargarPisos();
-    cargarHabitaciones();
-  }, [pisoSeleccionado]);
+    cargarDatos();
+  }, []);
 
-  const cargarPisos = async () => {
+  const cargarDatos = async () => {
     try {
-      const response = await axios.get(`${API}/pisos`);
-      setPisos(response.data);
+      const [habitacionesRes, pisosRes] = await Promise.all([
+        axios.get(`${API}/habitaciones`),
+        axios.get(`${API}/pisos`)
+      ]);
+      
+      // Enriquecer habitaciones con datos del piso y ocupación
+      const habitacionesEnriquecidas = await Promise.all(
+        habitacionesRes.data.map(async (hab) => {
+          const piso = pisosRes.data.find(p => p._id === hab.piso_id);
+          
+          // Buscar contrato activo
+          const contratosRes = await axios.get(`${API}/contratos?habitacion_id=${hab._id}&estado=activo`);
+          const contratoActivo = contratosRes.data.length > 0 ? contratosRes.data[0] : null;
+          
+          let inquilinoActual = null;
+          if (contratoActivo) {
+            const inquilinoRes = await axios.get(`${API}/inquilinos/${contratoActivo.inquilino_id}`);
+            inquilinoActual = inquilinoRes.data;
+          }
+          
+          return {
+            ...hab,
+            piso_nombre: piso?.nombre || 'N/A',
+            ocupada: !!contratoActivo,
+            inquilino_actual: inquilinoActual
+          };
+        })
+      );
+      
+      setHabitaciones(habitacionesEnriquecidas);
+      setPisos(pisosRes.data);
     } catch (error) {
-      toast.error('Error al cargar pisos');
-    }
-  };
-
-  const cargarHabitaciones = async () => {
-    try {
-      const url = pisoSeleccionado && pisoSeleccionado !== 'all' ? `${API}/habitaciones?piso_id=${pisoSeleccionado}` : `${API}/habitaciones`;
-      const response = await axios.get(url);
-      setHabitaciones(response.data);
-    } catch (error) {
-      toast.error('Error al cargar habitaciones');
+      toast.error('Error al cargar datos');
     }
   };
 
@@ -60,20 +81,19 @@ const Habitaciones = () => {
     try {
       const datos = {
         ...formData,
-        metros: parseFloat(formData.metros),
         precio_base: parseFloat(formData.precio_base)
       };
 
       if (habitacionEditar) {
         const { piso_id, ...datosUpdate } = datos;
-        await axios.put(`${API}/habitaciones/${habitacionEditar.id}`, datosUpdate);
+        await axios.put(`${API}/habitaciones/${habitacionEditar._id}`, datosUpdate);
         toast.success('Habitación actualizada correctamente');
       } else {
         await axios.post(`${API}/habitaciones`, datos);
         toast.success('Habitación creada correctamente');
       }
       
-      cargarHabitaciones();
+      cargarDatos();
       cerrarDialog();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error al guardar habitación');
@@ -88,7 +108,7 @@ const Habitaciones = () => {
     try {
       await axios.delete(`${API}/habitaciones/${id}`);
       toast.success('Habitación eliminada correctamente');
-      cargarHabitaciones();
+      cargarDatos();
     } catch (error) {
       toast.error(error.response?.data?.detail || 'Error al eliminar habitación');
     }
@@ -100,15 +120,13 @@ const Habitaciones = () => {
       setFormData({
         piso_id: habitacion.piso_id,
         nombre: habitacion.nombre,
-        metros: habitacion.metros,
-        precio_base: habitacion.precio_base
+        precio_base: habitacion.precio_base.toString()
       });
     } else {
       setHabitacionEditar(null);
       setFormData({
-        piso_id: pisoSeleccionado && pisoSeleccionado !== 'all' ? pisoSeleccionado : '',
+        piso_id: '',
         nombre: '',
-        metros: '',
         precio_base: ''
       });
     }
@@ -120,9 +138,14 @@ const Habitaciones = () => {
     setHabitacionEditar(null);
   };
 
-  const obtenerNombrePiso = (pisoId) => {
-    const piso = pisos.find(p => p.id === pisoId);
-    return piso?.nombre || 'N/A';
+  const verDetalle = async (habitacion) => {
+    try {
+      const response = await axios.get(`${API}/habitaciones/${habitacion._id}/detalle`);
+      setHabitacionDetalle(response.data);
+      setDialogDetalle(true);
+    } catch (error) {
+      toast.error('Error al cargar detalle de habitación');
+    }
   };
 
   const puedeEditar = usuario?.rol === 'admin' || usuario?.rol === 'supervisor';
@@ -159,32 +182,27 @@ const Habitaciones = () => {
                       </SelectTrigger>
                       <SelectContent>
                         {pisos.map(piso => (
-                          <SelectItem key={piso.id} value={piso.id}>{piso.nombre}</SelectItem>
+                          <SelectItem key={piso._id} value={piso._id}>
+                            {piso.nombre}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    {pisos.length === 0 && (
+                      <p className="text-sm text-red-500 mt-1">
+                        No hay pisos disponibles. Crea un piso primero.
+                      </p>
+                    )}
                   </div>
                   <div>
-                    <Label htmlFor="nombre">Nombre *</Label>
+                    <Label htmlFor="nombre">Nombre de la habitación *</Label>
                     <Input
                       id="nombre"
                       value={formData.nombre}
                       onChange={(e) => setFormData({...formData, nombre: e.target.value})}
-                      placeholder="Ej: Habitación 1"
+                      placeholder="Ej: Habitación 1, Hab A..."
                       required
                       data-testid="habitacion-nombre-input"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="metros">Metros cuadrados *</Label>
-                    <Input
-                      id="metros"
-                      type="number"
-                      step="0.01"
-                      value={formData.metros}
-                      onChange={(e) => setFormData({...formData, metros: e.target.value})}
-                      required
-                      data-testid="habitacion-metros-input"
                     />
                   </div>
                   <div>
@@ -195,6 +213,7 @@ const Habitaciones = () => {
                       step="0.01"
                       value={formData.precio_base}
                       onChange={(e) => setFormData({...formData, precio_base: e.target.value})}
+                      placeholder="350.00"
                       required
                       data-testid="habitacion-precio-input"
                     />
@@ -204,7 +223,7 @@ const Habitaciones = () => {
                   <Button type="button" variant="outline" onClick={cerrarDialog}>
                     Cancelar
                   </Button>
-                  <Button type="submit" disabled={cargando} data-testid="guardar-habitacion-button">
+                  <Button type="submit" disabled={cargando || pisos.length === 0} data-testid="guardar-habitacion-button">
                     {cargando ? 'Guardando...' : 'Guardar'}
                   </Button>
                 </DialogFooter>
@@ -214,28 +233,9 @@ const Habitaciones = () => {
         )}
       </div>
 
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="flex items-center gap-4">
-            <Label>Filtrar por piso:</Label>
-            <Select value={pisoSeleccionado} onValueChange={setPisoSeleccionado}>
-              <SelectTrigger className="w-64" data-testid="filtro-piso-select">
-                <SelectValue placeholder="Todos los pisos" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos los pisos</SelectItem>
-                {pisos.map(piso => (
-                  <SelectItem key={piso.id} value={piso.id}>{piso.nombre}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
-
       <Card>
         <CardHeader>
-          <CardTitle>Listado de Habitaciones</CardTitle>
+          <CardTitle>Listado de Habitaciones ({habitaciones.length})</CardTitle>
         </CardHeader>
         <CardContent>
           <Table>
@@ -243,9 +243,9 @@ const Habitaciones = () => {
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Piso</TableHead>
-                <TableHead>Metros</TableHead>
                 <TableHead>Precio Base</TableHead>
-                {(puedeEditar || puedeEliminar) && <TableHead className="text-right">Acciones</TableHead>}
+                <TableHead>Estado</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -257,37 +257,56 @@ const Habitaciones = () => {
                 </TableRow>
               ) : (
                 habitaciones.map((habitacion) => (
-                  <TableRow key={habitacion.id} data-testid={`habitacion-row-${habitacion.id}`}>
+                  <TableRow key={habitacion._id} data-testid={`habitacion-row-${habitacion._id}`}>
                     <TableCell className="font-medium">{habitacion.nombre}</TableCell>
-                    <TableCell>{obtenerNombrePiso(habitacion.piso_id)}</TableCell>
-                    <TableCell>{habitacion.metros} m²</TableCell>
+                    <TableCell>{habitacion.piso_nombre}</TableCell>
                     <TableCell>{habitacion.precio_base.toFixed(2)} €</TableCell>
-                    {(puedeEditar || puedeEliminar) && (
-                      <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          {puedeEditar && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => abrirDialog(habitacion)}
-                              data-testid={`editar-habitacion-${habitacion.id}`}
-                            >
-                              <Edit size={16} />
-                            </Button>
-                          )}
-                          {puedeEliminar && (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleEliminar(habitacion.id)}
-                              data-testid={`eliminar-habitacion-${habitacion.id}`}
-                            >
-                              <Trash2 size={16} />
-                            </Button>
+                    <TableCell>
+                      {habitacion.ocupada ? (
+                        <div>
+                          <Badge className="bg-green-100 text-green-800 mb-1">Ocupada</Badge>
+                          {habitacion.inquilino_actual && (
+                            <p className="text-sm text-gray-600">
+                              por: {habitacion.inquilino_actual.nombre}
+                            </p>
                           )}
                         </div>
-                      </TableCell>
-                    )}
+                      ) : (
+                        <Badge variant="secondary">Libre</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => verDetalle(habitacion)}
+                          data-testid={`ver-habitacion-${habitacion._id}`}
+                        >
+                          <Eye size={16} />
+                        </Button>
+                        {puedeEditar && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => abrirDialog(habitacion)}
+                            data-testid={`editar-habitacion-${habitacion._id}`}
+                          >
+                            <Edit size={16} />
+                          </Button>
+                        )}
+                        {puedeEliminar && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleEliminar(habitacion._id)}
+                            data-testid={`eliminar-habitacion-${habitacion._id}`}
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))
               )}
@@ -295,6 +314,131 @@ const Habitaciones = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Dialog de detalle de habitación */}
+      <Dialog open={dialogDetalle} onOpenChange={setDialogDetalle}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Detalle de Habitación</DialogTitle>
+          </DialogHeader>
+          {habitacionDetalle && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Información Básica</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label className="text-gray-600">Nombre</Label>
+                      <p className="font-medium">{habitacionDetalle.habitacion.nombre}</p>
+                    </div>
+                    <div>
+                      <Label className="text-gray-600">Piso</Label>
+                      <p className="font-medium">{habitacionDetalle.piso?.nombre}</p>
+                    </div>
+                    <div>
+                      <Label className="text-gray-600">Precio Base</Label>
+                      <p className="font-medium">{habitacionDetalle.habitacion.precio_base.toFixed(2)} €/mes</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {habitacionDetalle.contrato_activo && habitacionDetalle.inquilino_actual && (
+                <Card className="border-green-200 bg-green-50">
+                  <CardHeader>
+                    <CardTitle className="text-lg text-green-800">Contrato Actual</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-gray-700">Inquilino</Label>
+                        <p className="font-medium text-gray-900">{habitacionDetalle.inquilino_actual.nombre}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-700">Email</Label>
+                        <p className="text-sm text-gray-900">{habitacionDetalle.inquilino_actual.email}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-700">Teléfono</Label>
+                        <p className="text-sm text-gray-900">{habitacionDetalle.inquilino_actual.telefono}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-700">DNI</Label>
+                        <p className="text-sm text-gray-900">{habitacionDetalle.inquilino_actual.dni}</p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-700">Fecha Inicio</Label>
+                        <p className="font-medium text-gray-900">
+                          {format(new Date(habitacionDetalle.contrato_activo.fecha_inicio), 'dd/MM/yyyy', { locale: es })}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-gray-700">Fecha Fin</Label>
+                        <p className="font-medium text-gray-900">
+                          {format(new Date(habitacionDetalle.contrato_activo.fecha_fin), 'dd/MM/yyyy', { locale: es })}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-lg">Historial de Contratos</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {habitacionDetalle.historial_contratos.length === 0 ? (
+                    <p className="text-gray-500 text-center py-4">No hay contratos registrados</p>
+                  ) : (
+                    <div className="space-y-3">
+                      {habitacionDetalle.historial_contratos.map((item, index) => (
+                        <Card key={index} className="border">
+                          <CardContent className="pt-4">
+                            <div className="flex justify-between items-start mb-2">
+                              <div>
+                                <p className="font-medium">{item.inquilino?.nombre || 'N/A'}</p>
+                                <p className="text-sm text-gray-600">{item.inquilino?.email || ''}</p>
+                              </div>
+                              <Badge variant={item.contrato.estado === 'activo' ? 'default' : 'secondary'}>
+                                {item.contrato.estado}
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <div>
+                                <span className="text-gray-600">Desde:</span>{' '}
+                                <span className="font-medium">
+                                  {format(new Date(item.contrato.fecha_inicio), 'dd/MM/yyyy', { locale: es })}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-gray-600">Hasta:</span>{' '}
+                                <span className="font-medium">
+                                  {format(new Date(item.contrato.fecha_fin), 'dd/MM/yyyy', { locale: es })}
+                                </span>
+                              </div>
+                              <div>
+                                <span className="text-gray-600">Renta:</span>{' '}
+                                <span className="font-medium">{item.contrato.renta_mensual.toFixed(2)} €</span>
+                              </div>
+                              <div>
+                                <span className="text-gray-600">Fianza:</span>{' '}
+                                <span className="font-medium">{item.contrato.fianza.toFixed(2)} €</span>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
