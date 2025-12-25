@@ -141,7 +141,7 @@ class PagoBase(BaseModel):
     fecha_pago: Optional[datetime] = None
     tipo: Literal["alquiler", "gastos", "fianza_cobrada", "fianza_devuelta"]
     importe: float
-    metodo: Literal["efectivo", "transferencia", "tarjeta", "otro"] = "efectivo"
+    metodo: Literal["efectivo", "transferencia"] = "efectivo"
     estado: Literal["pendiente", "en_revision", "pagado", "atrasado"] = "pendiente"
     notas: Optional[str] = None
 
