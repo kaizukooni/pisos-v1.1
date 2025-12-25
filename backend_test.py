@@ -47,7 +47,11 @@ class RentalSystemAPITester:
                 self.tests_passed += 1
                 print(f"✅ Passed - Status: {response.status_code}")
                 try:
-                    return True, response.json() if response.content else {}
+                    response_data = response.json() if response.content else {}
+                    # Handle both 'id' and '_id' fields
+                    if '_id' in response_data:
+                        response_data['id'] = response_data['_id']
+                    return True, response_data
                 except:
                     return True, {}
             else:
