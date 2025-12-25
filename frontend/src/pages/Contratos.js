@@ -67,7 +67,7 @@ const Contratos = () => {
   const cargarContratos = async () => {
     try {
       let url = `${API}/contratos`;
-      if (filtros.estado) {
+      if (filtros.estado && filtros.estado !== 'all') {
         url += `?estado=${filtros.estado}`;
       }
       const response = await axios.get(url);
