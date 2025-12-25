@@ -292,7 +292,7 @@ const Contratos = () => {
                 <SelectValue placeholder="Todos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos</SelectItem>
+                <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="activo">Activos</SelectItem>
                 <SelectItem value="finalizado">Finalizados</SelectItem>
               </SelectContent>
