@@ -356,6 +356,48 @@ async def eliminar_habitacion(habitacion_id: str, usuario_actual: dict = Depends
         raise HTTPException(status_code=404, detail="Habitación no encontrada")
     return {"mensaje": "Habitación eliminada correctamente"}
 
+@app.get("/api/habitaciones/{habitacion_id}/detalle")
+async def obtener_detalle_habitacion(habitacion_id: str, usuario_actual: dict = Depends(obtener_usuario_actual)):
+    """Obtiene el detalle completo de una habitación con contrato actual e historial"""
+    habitacion = await habitaciones_collection.find_one({"_id": habitacion_id})
+    if not habitacion:
+        raise HTTPException(status_code=404, detail="Habitación no encontrada")
+    
+    piso = await pisos_collection.find_one({"_id": habitacion["piso_id"]})
+    
+    # Buscar contrato activo
+    contrato_activo = await contratos_collection.find_one({
+        "habitacion_id": habitacion_id,
+        "estado": "activo"
+    })
+    
+    inquilino_actual = None
+    if contrato_activo:
+        inquilino = await inquilinos_collection.find_one({"_id": contrato_activo["inquilino_id"]})
+        if inquilino:
+            inquilino_actual = Inquilino(**inquilino)
+    
+    # Obtener historial de contratos
+    contratos_historial = await contratos_collection.find({
+        "habitacion_id": habitacion_id
+    }).sort("fecha_inicio", -1).to_list(1000)
+    
+    historial = []
+    for contrato in contratos_historial:
+        inquilino = await inquilinos_collection.find_one({"_id": contrato["inquilino_id"]})
+        historial.append({
+            "contrato": Contrato(**contrato),
+            "inquilino": Inquilino(**inquilino) if inquilino else None
+        })
+    
+    return {
+        "habitacion": Habitacion(**habitacion),
+        "piso": Piso(**piso) if piso else None,
+        "contrato_activo": Contrato(**contrato_activo) if contrato_activo else None,
+        "inquilino_actual": inquilino_actual,
+        "historial_contratos": historial
+    }
+
 # ============= INQUILINOS =============
 @app.get("/api/inquilinos", response_model=List[Inquilino])
 async def listar_inquilinos(
