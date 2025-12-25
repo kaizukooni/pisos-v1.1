@@ -223,7 +223,7 @@ const Habitaciones = () => {
                 <SelectValue placeholder="Todos los pisos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos los pisos</SelectItem>
+                <SelectItem value="all">Todos los pisos</SelectItem>
                 {pisos.map(piso => (
                   <SelectItem key={piso.id} value={piso.id}>{piso.nombre}</SelectItem>
                 ))}
