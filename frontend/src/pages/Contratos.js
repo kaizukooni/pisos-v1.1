@@ -28,7 +28,7 @@ const Contratos = () => {
   const [cargando, setCargando] = useState(false);
   
   const [filtros, setFiltros] = useState({
-    estado: ''
+    estado: 'all'
   });
 
   const [formData, setFormData] = useState({
