@@ -187,6 +187,35 @@ async def listar_pisos(usuario_actual: dict = Depends(obtener_usuario_actual)):
     pisos = await pisos_collection.find({}).to_list(1000)
     return [Piso(**p) for p in pisos]
 
+@app.get("/api/pisos/con-conteo")
+async def listar_pisos_con_conteo(usuario_actual: dict = Depends(obtener_usuario_actual)):
+    """Lista todos los pisos con conteo de habitaciones"""
+    pisos = await pisos_collection.find({}).to_list(1000)
+    
+    resultado = []
+    for piso in pisos:
+        total_habitaciones = await habitaciones_collection.count_documents({"piso_id": piso["_id"]})
+        
+        # Contar habitaciones ocupadas
+        habitaciones = await habitaciones_collection.find({"piso_id": piso["_id"]}).to_list(1000)
+        habitaciones_ocupadas = 0
+        for habitacion in habitaciones:
+            contrato_activo = await contratos_collection.find_one({
+                "habitacion_id": habitacion["_id"],
+                "estado": "activo"
+            })
+            if contrato_activo:
+                habitaciones_ocupadas += 1
+        
+        resultado.append({
+            "piso": piso,
+            "total_habitaciones": total_habitaciones,
+            "habitaciones_ocupadas": habitaciones_ocupadas,
+            "habitaciones_libres": total_habitaciones - habitaciones_ocupadas
+        })
+    
+    return resultado
+
 @app.post("/api/pisos", response_model=Piso, status_code=status.HTTP_201_CREATED)
 async def crear_piso(datos: PisoCreate, usuario_actual: dict = Depends(verificar_rol(["admin", "supervisor"]))):
     """Crea un nuevo piso"""
