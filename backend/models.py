@@ -64,7 +64,6 @@ class Piso(PisoBase):
 class HabitacionBase(BaseModel):
     piso_id: str
     nombre: str
-    metros: float
     precio_base: float
 
 class HabitacionCreate(HabitacionBase):
@@ -72,7 +71,6 @@ class HabitacionCreate(HabitacionBase):
 
 class HabitacionUpdate(BaseModel):
     nombre: Optional[str] = None
-    metros: Optional[float] = None
     precio_base: Optional[float] = None
 
 class Habitacion(HabitacionBase):
