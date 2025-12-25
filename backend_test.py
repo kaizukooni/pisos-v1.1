@@ -135,6 +135,13 @@ class RentalSystemAPITester:
         if success and 'id' in response:
             self.created_ids['piso'] = response['id']
             print(f"   Created Piso ID: {self.created_ids['piso']}")
+        elif success:
+            # Try to get the ID from the response
+            print(f"   Response: {response}")
+            if '_id' in response:
+                self.created_ids['piso'] = response['_id']
+            elif 'id' in response:
+                self.created_ids['piso'] = response['id']
 
         # List Pisos
         self.run_test("List Pisos", "GET", "pisos", 200)
