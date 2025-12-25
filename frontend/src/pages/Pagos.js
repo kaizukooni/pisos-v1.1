@@ -127,8 +127,9 @@ const Pagos = () => {
   };
 
   const obtenerNombreContrato = (contratoId) => {
+    if (!contratoId) return 'N/A';
     const contrato = contratos.find(c => c.id === contratoId);
-    return contrato ? `Contrato ${contratoId.slice(0, 8)}` : 'N/A';
+    return contrato ? `Contrato ${contratoId.substring(0, 8)}...` : `Contrato ${contratoId.substring(0, 8)}...`;
   };
 
   const obtenerColorEstado = (estado) => {
