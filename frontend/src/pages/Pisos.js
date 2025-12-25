@@ -42,7 +42,6 @@ const Pisos = () => {
   const [formHabitacion, setFormHabitacion] = useState({
     piso_id: '',
     nombre: '',
-    metros: '',
     precio_base: ''
   });
 
