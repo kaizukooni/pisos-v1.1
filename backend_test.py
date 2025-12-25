@@ -385,11 +385,13 @@ class RentalSystemAPITester:
         # List Usuarios
         success, response = self.run_test("List Usuarios", "GET", "usuarios", 200)
 
-        # Create Usuario
+        # Create Usuario with unique email
+        import random
+        user_suffix = random.randint(1000, 9999)
         usuario_data = {
             "nombre": "Test Supervisor",
             "whatsapp": "+34600999888",
-            "email": "supervisor.test@example.com",
+            "email": f"supervisor.test{user_suffix}@example.com",
             "rol": "supervisor",
             "activo": True,
             "contraseña": "TestPass123"
