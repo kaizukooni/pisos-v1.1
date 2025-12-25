@@ -17,7 +17,7 @@ const Habitaciones = () => {
   const { usuario } = useAuth();
   const [habitaciones, setHabitaciones] = useState([]);
   const [pisos, setPisos] = useState([]);
-  const [pisoSeleccionado, setPisoSeleccionado] = useState('');
+  const [pisoSeleccionado, setPisoSeleccionado] = useState('all');
   const [dialogAbierto, setDialogAbierto] = useState(false);
   const [habitacionEditar, setHabitacionEditar] = useState(null);
   const [cargando, setCargando] = useState(false);
