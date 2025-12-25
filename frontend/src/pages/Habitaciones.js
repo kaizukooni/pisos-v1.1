@@ -106,7 +106,7 @@ const Habitaciones = () => {
     } else {
       setHabitacionEditar(null);
       setFormData({
-        piso_id: pisoSeleccionado || '',
+        piso_id: pisoSeleccionado && pisoSeleccionado !== 'all' ? pisoSeleccionado : '',
         nombre: '',
         metros: '',
         precio_base: ''
