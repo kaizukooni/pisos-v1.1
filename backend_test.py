@@ -219,12 +219,14 @@ class RentalSystemAPITester:
 
     def test_inquilinos_crud(self):
         """Test Inquilinos CRUD operations"""
-        # Create Inquilino
+        # Create Inquilino with unique DNI
+        import random
+        dni_suffix = random.randint(1000, 9999)
         inquilino_data = {
             "nombre": "Juan Test",
-            "email": "juan.test@example.com",
+            "email": f"juan.test{dni_suffix}@example.com",
             "telefono": "+34600123456",
-            "dni": "12345678Z",
+            "dni": f"1234567{dni_suffix}Z",
             "activo": True
         }
         success, response = self.run_test(
