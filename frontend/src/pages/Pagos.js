@@ -24,8 +24,8 @@ const Pagos = () => {
   const [cargando, setCargando] = useState(false);
   
   const [filtros, setFiltros] = useState({
-    estado: '',
-    tipo: '',
+    estado: 'all',
+    tipo: 'all',
     mes_anio: ''
   });
 
