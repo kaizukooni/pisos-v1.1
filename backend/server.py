@@ -486,6 +486,12 @@ async def actualizar_pago(pago_id: str, datos: PagoUpdate, usuario_actual: dict 
     if "estado" in update_data:
         if update_data["estado"] == "pagado" and usuario_actual["rol"] == "cobros":
             raise HTTPException(status_code=403, detail="No tienes permiso para marcar pagos como pagados")
+        # Si se cambia a pagado, registrar quién lo revisó
+        if update_data["estado"] == "pagado":
+            update_data["revisado_por_usuario_id"] = usuario_actual["sub"]
+    
+    # Actualizar fecha de última modificación
+    update_data["fecha_ultima_actualizacion"] = datetime.now(timezone.utc)
     
     resultado = await pagos_collection.update_one({"_id": pago_id}, {"$set": update_data})
     if resultado.matched_count == 0:
