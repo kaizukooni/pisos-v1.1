@@ -457,6 +457,8 @@ async def crear_pago(datos: PagoCreate, usuario_actual: dict = Depends(obtener_u
     
     pago_dict = datos.model_dump()
     pago_dict["_id"] = str(ObjectId())
+    pago_dict["fecha_creacion"] = datetime.now(timezone.utc)
+    pago_dict["fecha_ultima_actualizacion"] = None
     
     # Si el usuario es cobros, el pago pasa a en_revision
     if usuario_actual["rol"] == "cobros" and pago_dict["estado"] == "pendiente":
