@@ -16,8 +16,7 @@ const Layout = () => {
 
   const menuItems = [
     { path: '/dashboard', label: 'Dashboard', icon: Home, roles: ['admin', 'supervisor', 'cobros'] },
-    { path: '/pisos', label: 'Pisos', icon: Building2, roles: ['admin', 'supervisor', 'cobros'] },
-    { path: '/habitaciones', label: 'Habitaciones', icon: DoorOpen, roles: ['admin', 'supervisor', 'cobros'] },
+    { path: '/pisos', label: 'Pisos y Habitaciones', icon: Building2, roles: ['admin', 'supervisor', 'cobros'] },
     { path: '/inquilinos', label: 'Inquilinos', icon: Users, roles: ['admin', 'supervisor', 'cobros'] },
     { path: '/contratos', label: 'Contratos', icon: FileText, roles: ['admin', 'supervisor', 'cobros'] },
     { path: '/pagos', label: 'Pagos', icon: CreditCard, roles: ['admin', 'supervisor', 'cobros'] },
