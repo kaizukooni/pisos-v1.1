@@ -282,7 +282,7 @@ const Pagos = () => {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="pendiente">Pendiente</SelectItem>
                   <SelectItem value="en_revision">En Revisión</SelectItem>
                   <SelectItem value="pagado">Pagado</SelectItem>
@@ -297,7 +297,7 @@ const Pagos = () => {
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
                   <SelectItem value="alquiler">Alquiler</SelectItem>
                   <SelectItem value="gastos">Gastos</SelectItem>
                   <SelectItem value="fianza_cobrada">Fianza Cobrada</SelectItem>
