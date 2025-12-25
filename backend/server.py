@@ -230,6 +230,73 @@ async def eliminar_piso(piso_id: str, usuario_actual: dict = Depends(verificar_r
         raise HTTPException(status_code=404, detail="Piso no encontrado")
     return {"mensaje": "Piso eliminado correctamente"}
 
+@app.get("/api/pisos/{piso_id}/habitaciones")
+async def listar_habitaciones_piso(piso_id: str, usuario_actual: dict = Depends(obtener_usuario_actual)):
+    """Lista todas las habitaciones de un piso específico con estado de ocupación"""
+    # Verificar que el piso existe
+    piso = await pisos_collection.find_one({"_id": piso_id})
+    if not piso:
+        raise HTTPException(status_code=404, detail="Piso no encontrado")
+    
+    habitaciones = await habitaciones_collection.find({"piso_id": piso_id}).to_list(1000)
+    
+    # Enriquecer con estado de ocupación
+    resultado = []
+    for habitacion in habitaciones:
+        # Buscar contrato activo
+        contrato_activo = await contratos_collection.find_one({
+            "habitacion_id": habitacion["_id"],
+            "estado": "activo"
+        })
+        
+        inquilino_actual = None
+        if contrato_activo:
+            inquilino = await inquilinos_collection.find_one({"_id": contrato_activo["inquilino_id"]})
+            if inquilino:
+                inquilino_actual = {
+                    "id": inquilino["_id"],
+                    "nombre": inquilino["nombre"],
+                    "email": inquilino["email"],
+                    "telefono": inquilino["telefono"]
+                }
+        
+        resultado.append({
+            "habitacion": Habitacion(**habitacion),
+            "ocupada": contrato_activo is not None,
+            "inquilino_actual": inquilino_actual,
+            "contrato_activo_id": contrato_activo["_id"] if contrato_activo else None
+        })
+    
+    return resultado
+
+@app.get("/api/pisos/{piso_id}/detalle")
+async def obtener_detalle_piso(piso_id: str, usuario_actual: dict = Depends(obtener_usuario_actual)):
+    """Obtiene el detalle completo de un piso con sus habitaciones y estadísticas"""
+    piso = await pisos_collection.find_one({"_id": piso_id})
+    if not piso:
+        raise HTTPException(status_code=404, detail="Piso no encontrado")
+    
+    # Obtener todas las habitaciones del piso
+    habitaciones = await habitaciones_collection.find({"piso_id": piso_id}).to_list(1000)
+    total_habitaciones = len(habitaciones)
+    
+    # Contar habitaciones ocupadas
+    habitaciones_ocupadas = 0
+    for habitacion in habitaciones:
+        contrato_activo = await contratos_collection.find_one({
+            "habitacion_id": habitacion["_id"],
+            "estado": "activo"
+        })
+        if contrato_activo:
+            habitaciones_ocupadas += 1
+    
+    return {
+        "piso": Piso(**piso),
+        "total_habitaciones": total_habitaciones,
+        "habitaciones_ocupadas": habitaciones_ocupadas,
+        "habitaciones_libres": total_habitaciones - habitaciones_ocupadas
+    }
+
 # ============= HABITACIONES =============
 @app.get("/api/habitaciones", response_model=List[Habitacion])
 async def listar_habitaciones(
