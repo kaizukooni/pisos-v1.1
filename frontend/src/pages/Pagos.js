@@ -609,7 +609,7 @@ const Pagos = () => {
                         </p>
                       )}
                     </div>
-                    {pagoDetalle.revisado_por_nombre && (
+                    {pagoDetalle.pago.revisado_por_usuario_id && (
                       <div>
                         <Label className="text-xs text-gray-600">Confirmado por</Label>
                         <p className="font-medium">{pagoDetalle.revisado_por_nombre}</p>
