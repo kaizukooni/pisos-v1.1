@@ -105,6 +105,7 @@ class ResultadoLiquidacionFianza(BaseModel):
     importe_a_devolver: Optional[float] = None
     fecha_liquidacion: Optional[datetime] = None
 
+
 class ContratoBase(BaseModel):
     habitacion_id: str
     inquilino_id: str
@@ -114,18 +115,31 @@ class ContratoBase(BaseModel):
     fianza: float
     gastos_mensuales_tarifa: float = 50.0
     tiene_limpieza: bool = False
-    estado: Literal["activo", "finalizado"] = "activo"
+    importe_limpieza_mensual: Optional[float] = None
+    dia_pago: int = 1
+    estado: Literal["activo", "finalizado", "programado"] = "activo"
     archivado: bool = False
+
 
 class ContratoCreate(ContratoBase):
     pass
 
+
 class ContratoUpdate(BaseModel):
+    habitacion_id: Optional[str] = None
+    inquilino_id: Optional[str] = None
+    fecha_inicio: Optional[datetime] = None
     fecha_fin: Optional[datetime] = None
     renta_mensual: Optional[float] = None
-    estado: Optional[Literal["activo", "finalizado"]] = None
+    fianza: Optional[float] = None
+    gastos_mensuales_tarifa: Optional[float] = None
+    tiene_limpieza: Optional[bool] = None
+    importe_limpieza_mensual: Optional[float] = None
+    dia_pago: Optional[int] = None
+    estado: Optional[Literal["activo", "finalizado", "programado"]] = None
     archivado: Optional[bool] = None
-    resultado_liquidacion_fianza: Optional[ResultadoLiquidacionFianza] = None
+
+
 
 class Contrato(ContratoBase):
     model_config = ConfigDict(populate_by_name=True, arbitrary_types_allowed=True)

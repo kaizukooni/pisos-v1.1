@@ -5,6 +5,8 @@ import os
 from datetime import datetime, timezone
 from bson import ObjectId
 from typing import List, Optional
+from pydantic import BaseModel
+from typing import Literal
 
 from models import (
     Usuario, UsuarioCreate, UsuarioUpdate,
@@ -66,6 +68,19 @@ async def lifespan(app: FastAPI):
     await cerrar_conexion()
 
 app = FastAPI(title="Sistema de Gestión de Alquileres", lifespan=lifespan)
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -513,30 +528,54 @@ async def listar_contratos(
 @app.post("/api/contratos", response_model=Contrato, status_code=status.HTTP_201_CREATED)
 async def crear_contrato(datos: ContratoCreate, usuario_actual: dict = Depends(verificar_rol(["admin", "supervisor"]))):
     """Crea un nuevo contrato"""
-    # Verificar que habitación e inquilino existen
+
+    # 0) Validación básica: fechas correctas
+    if datos.fecha_inicio >= datos.fecha_fin:
+        raise HTTPException(status_code=400, detail="La fecha de inicio debe ser anterior a la fecha fin")
+
+    # 1) Verificar que habitación e inquilino existen
     habitacion = await habitaciones_collection.find_one({"_id": datos.habitacion_id})
     if not habitacion:
         raise HTTPException(status_code=404, detail="Habitación no encontrada")
-    
+
     inquilino = await inquilinos_collection.find_one({"_id": datos.inquilino_id})
     if not inquilino:
         raise HTTPException(status_code=404, detail="Inquilino no encontrado")
-    
-    # Verificar que no haya contrato activo en esa habitación
-    contrato_activo = await contratos_collection.find_one({
+
+    # 2) Validar día de pago (1–31) (si no llega, por defecto es 1)
+    dia_pago = getattr(datos, "dia_pago", 1)
+    if dia_pago < 1 or dia_pago > 31:
+        raise HTTPException(status_code=400, detail="El día de pago debe estar entre 1 y 31")
+
+    # 3) Buscar contratos existentes de esa habitación (activos o programados) y comprobar solapamiento
+    contratos_existentes = await contratos_collection.find({
         "habitacion_id": datos.habitacion_id,
-        "estado": "activo"
-    })
-    if contrato_activo:
-        raise HTTPException(status_code=400, detail="Ya existe un contrato activo en esta habitación")
-    
+        "estado": {"$in": ["activo", "programado"]},
+        "archivado": False
+    }).to_list(1000)
+
+    for c in contratos_existentes:
+        # solapamiento: si se cruzan las fechas
+        if datos.fecha_inicio <= c["fecha_fin"] and datos.fecha_fin >= c["fecha_inicio"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Ya existe un contrato en esa habitación que se solapa con esas fechas"
+            )
+
+       # 4) Crear contrato
     contrato_dict = datos.model_dump()
     contrato_dict["_id"] = str(ObjectId())
+
+    # Si el contrato empieza en el futuro, marcar como programado
+    if contrato_dict["fecha_inicio"].replace(tzinfo=timezone.utc) > datetime.now(timezone.utc):
+        contrato_dict["estado"] = "programado"
+
     contrato_dict["resultado_liquidacion_fianza"] = {
         "estado": "pendiente",
         "importe_a_devolver": None,
         "fecha_liquidacion": None
     }
+
     await contratos_collection.insert_one(contrato_dict)
     return Contrato(**contrato_dict)
 
@@ -547,20 +586,63 @@ async def obtener_contrato(contrato_id: str, usuario_actual: dict = Depends(obte
     if not contrato:
         raise HTTPException(status_code=404, detail="Contrato no encontrado")
     return Contrato(**contrato)
+    
 
 @app.put("/api/contratos/{contrato_id}", response_model=Contrato)
-async def actualizar_contrato(contrato_id: str, datos: ContratoUpdate, usuario_actual: dict = Depends(verificar_rol(["admin", "supervisor"]))):
+async def actualizar_contrato(
+    contrato_id: str,
+    datos: ContratoUpdate,
+    usuario_actual: dict = Depends(verificar_rol(["admin", "supervisor"]))
+):
     """Actualiza un contrato"""
+    # 1) Buscar el contrato actual
+    contrato_actual = await contratos_collection.find_one({"_id": contrato_id})
+    if not contrato_actual:
+        raise HTTPException(status_code=404, detail="Contrato no encontrado")
+
+    # 2) Datos que llegan para actualizar
     update_data = {k: v for k, v in datos.model_dump(exclude_unset=True).items() if v is not None}
     if not update_data:
         raise HTTPException(status_code=400, detail="No hay datos para actualizar")
-    
+
+    # 3) Validar día de pago si lo envían
+    if "dia_pago" in update_data:
+        if update_data["dia_pago"] < 1 or update_data["dia_pago"] > 31:
+            raise HTTPException(status_code=400, detail="El día de pago debe estar entre 1 y 31")
+
+    # 4) Preparar valores finales (si no vienen, usar los actuales)
+    nueva_habitacion_id = update_data.get("habitacion_id", contrato_actual["habitacion_id"])
+    nueva_fecha_inicio = update_data.get("fecha_inicio", contrato_actual["fecha_inicio"])
+    nueva_fecha_fin = update_data.get("fecha_fin", contrato_actual["fecha_fin"])
+
+    # Si las fechas quedan mal, cortar
+    if nueva_fecha_inicio >= nueva_fecha_fin:
+        raise HTTPException(status_code=400, detail="La fecha de inicio debe ser anterior a la fecha fin")
+
+    # 5) Comprobar solapamiento con OTROS contratos de esa habitación (activos o programados)
+    contratos_existentes = await contratos_collection.find({
+        "habitacion_id": nueva_habitacion_id,
+        "estado": {"$in": ["activo", "programado"]},
+        "archivado": False,
+        "_id": {"$ne": contrato_id}  # importante: excluir el mismo contrato
+    }).to_list(1000)
+
+    for c in contratos_existentes:
+        if nueva_fecha_inicio <= c["fecha_fin"] and nueva_fecha_fin >= c["fecha_inicio"]:
+            raise HTTPException(
+                status_code=400,
+                detail="Ya existe un contrato en esa habitación que se solapa con esas fechas"
+            )
+
+    # 6) Hacer update en BD
     resultado = await contratos_collection.update_one({"_id": contrato_id}, {"$set": update_data})
     if resultado.matched_count == 0:
         raise HTTPException(status_code=404, detail="Contrato no encontrado")
-    
+
     contrato = await contratos_collection.find_one({"_id": contrato_id})
     return Contrato(**contrato)
+
+
 
 # ============= PAGOS =============
 @app.get("/api/pagos/enriquecidos")

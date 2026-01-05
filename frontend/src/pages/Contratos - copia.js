@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -31,25 +31,16 @@ const Contratos = () => {
     estado: 'all'
   });
 
-const [formData, setFormData] = useState({
-  piso_id: "",
-  habitacion_id: "",
-  inquilino_id: "",
-  fecha_inicio: "",
-  fecha_fin: "",
-  renta_mensual: "",
-  fianza: "",
-  gastos_mensuales_tarifa: "50",
-  dia_pago: "1",
-  tiene_limpieza: false,
-  importe_limpieza_mensual: "",
-  estado: "activo"
-});
-
-const habitacionesFiltradas = formData.piso_id
-  ? habitaciones.filter(h => h.piso_id === formData.piso_id)
-  : [];
-
+  const [formData, setFormData] = useState({
+    habitacion_id: '',
+    inquilino_id: '',
+    fecha_inicio: '',
+    fecha_fin: '',
+    renta_mensual: '',
+    fianza: '',
+    gastos_mensuales_tarifa: '50',
+    tiene_limpieza: false
+  });
 
   useEffect(() => {
     cargarDatos();
@@ -86,146 +77,45 @@ const habitacionesFiltradas = formData.piso_id
     }
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setCargando(true);
 
-const handleSubmit = async (e) => {
-  e.preventDefault();
-  setCargando(true);
+    try {
+      const datos = {
+        ...formData,
+        fecha_inicio: new Date(formData.fecha_inicio).toISOString(),
+        fecha_fin: new Date(formData.fecha_fin).toISOString(),
+        renta_mensual: parseFloat(formData.renta_mensual),
+        fianza: parseFloat(formData.fianza),
+        gastos_mensuales_tarifa: parseFloat(formData.gastos_mensuales_tarifa)
+      };
 
-  // VALIDACIONES (una sola vez)
-  if (!formData.piso_id) {
-    alert("Selecciona un piso");
-    setCargando(false);
-    return;
-  }
-
-  if (!formData.habitacion_id) {
-    alert("Selecciona una habitación");
-    setCargando(false);
-    return;
-  }
-
-  if (!formData.inquilino_id) {
-    alert("Selecciona un inquilino");
-    setCargando(false);
-    return;
-  }
-
-  if (!formData.fecha_inicio || !formData.fecha_fin) {
-    alert("Selecciona fechas de inicio y fin");
-    setCargando(false);
-    return;
-  }
-
-  if (new Date(formData.fecha_fin) <= new Date(formData.fecha_inicio)) {
-    alert("La fecha fin debe ser posterior a la fecha inicio");
-    setCargando(false);
-    return;
-  }
-
-  if (Number(formData.renta_mensual) <= 0) {
-    alert("La renta debe ser mayor que 0");
-    setCargando(false);
-    return;
-  }
-
-  if (Number(formData.fianza) < 0) {
-    alert("La fianza no puede ser negativa");
-    setCargando(false);
-    return;
-  }
-
-  if (Number(formData.gastos_mensuales_tarifa) < 0) {
-    alert("Los gastos no pueden ser negativos");
-    setCargando(false);
-    return;
-  }
-
-  if (formData.tiene_limpieza && Number(formData.importe_limpieza_mensual) <= 0) {
-    alert("Si incluye limpieza, indica un importe válido");
-    setCargando(false);
-    return;
-  }
-
-  if (Number(formData.dia_pago) < 1 || Number(formData.dia_pago) > 31) {
-    alert("El día de pago debe estar entre 1 y 31");
-    setCargando(false);
-    return;
-  }
-
-  try {
-// ✅ NO enviamos piso_id al backend
-// ✅ SOLO enviamos estado si estamos EDITANDO
-const payloadBase = {
-  habitacion_id: formData.habitacion_id,
-  inquilino_id: formData.inquilino_id,
-  fecha_inicio: formData.fecha_inicio,
-  fecha_fin: formData.fecha_fin,
-  renta_mensual: Number(formData.renta_mensual),
-  fianza: Number(formData.fianza),
-  gastos_mensuales_tarifa: Number(formData.gastos_mensuales_tarifa),
-  dia_pago: 1,
-  tiene_limpieza: !!formData.tiene_limpieza,
-
-  // ✅ SOLO incluir este campo SI tiene_limpieza es true
-  ...(formData.tiene_limpieza
-    ? { importe_limpieza_mensual: Number(formData.importe_limpieza_mensual) }
-    : {}),
-};
-
-// ✅ estado SOLO si editas (PUT). En creación (POST) NO.
-const payload =
-  contratoSeleccionado && contratoSeleccionado._id
-    ? { ...payloadBase, estado: formData.estado || "activo" }
-    : payloadBase;
-
-console.log("✅ PAYLOAD ENVIADO:", payload);
-
-
-    if (contratoSeleccionado && contratoSeleccionado._id) {
-      await axios.put(`${API}/contratos/${contratoSeleccionado._id}`, payload);
-    } else {
-      await axios.post(`${API}/contratos`, payload);
+      await axios.post(`${API}/contratos`, datos);
+      toast.success('Contrato creado correctamente');
+      
+      cargarContratos();
+      cerrarDialog();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Error al crear contrato');
+    } finally {
+      setCargando(false);
     }
+  };
 
-    cerrarDialog();
-    await cargarContratos();
-  } catch (error) {
-  console.log("❌ ERROR AXIOS COMPLETO:", error);
-  console.log("❌ STATUS:", error?.response?.status);
-  console.log("❌ DATA:", error?.response?.data);
-
-  alert(
-    "Error guardando el contrato:\n" +
-    JSON.stringify(error?.response?.data || error.message, null, 2)
-  );
-} finally {
-  setCargando(false);
-}
-};
-
-
-
-
-const abrirDialog = () => {
-  setFormData({
-    piso_id: "",
-    habitacion_id: "",
-    inquilino_id: "",
-    fecha_inicio: "",
-    fecha_fin: "",
-    renta_mensual: "",
-    fianza: "",
-    gastos_mensuales_tarifa: "50",
-    dia_pago: "1",
-    tiene_limpieza: false,
-    importe_limpieza_mensual: "",
-    estado: "activo"
-  });
-
-  setContratoSeleccionado(null);
-  setDialogAbierto(true);
-};
-
+  const abrirDialog = () => {
+    setFormData({
+      habitacion_id: '',
+      inquilino_id: '',
+      fecha_inicio: '',
+      fecha_fin: '',
+      renta_mensual: '',
+      fianza: '',
+      gastos_mensuales_tarifa: '50',
+      tiene_limpieza: false
+    });
+    setDialogAbierto(true);
+  };
 
   const cerrarDialog = () => {
     setDialogAbierto(false);
@@ -237,21 +127,20 @@ const abrirDialog = () => {
   };
 
   const obtenerNombreHabitacion = (habitacionId) => {
-    const habitacion = habitaciones.find(h => h._id === habitacionId);
+    const habitacion = habitaciones.find(h => h.id === habitacionId);
     if (!habitacion) return 'N/A';
-    const piso = pisos.find(p => p._id === habitacion.piso_id);
+    const piso = pisos.find(p => p.id === habitacion.piso_id);
     return `${piso?.nombre || 'N/A'} - ${habitacion.nombre}`;
   };
 
   const obtenerNombreInquilino = (inquilinoId) => {
-    const inquilino = inquilinos.find(i => i._id === inquilinoId);
+    const inquilino = inquilinos.find(i => i.id === inquilinoId);
     return inquilino?.nombre || 'N/A';
   };
 
   const puedeCrear = usuario?.rol === 'admin' || usuario?.rol === 'supervisor';
 
-
-return (
+  return (
     <div data-testid="contratos-page">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-3xl font-bold text-gray-900">Contratos</h1>
@@ -266,63 +155,35 @@ return (
             <DialogContent className="max-w-2xl">
               <DialogHeader>
                 <DialogTitle>Nuevo Contrato</DialogTitle>
-				<DialogDescription>
-      Rellena los datos para crear un contrato.
-    </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleSubmit}>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="col-span-2">
-                  <div className="col-span-2">
-		<Label>Piso *</Label>
-  <Select
-    value={formData.piso_id || ""}
-    onValueChange={(value) =>
-      setFormData({
-        ...formData,
-        piso_id: value,
-        habitacion_id: ""
-      })
-    }
-    required
-  >
-    <SelectTrigger data-testid="piso-select">
-      <SelectValue placeholder="Selecciona un piso" />
-    </SelectTrigger>
-<SelectContent>
-  {pisos.map((piso) => (
-    <SelectItem key={piso._id} value={piso._id}>
-      {piso.nombre}
-    </SelectItem>
-  ))}
-</SelectContent>
-
-  </Select>
-</div>
-
-				  <Label>Habitación *</Label>
+                    <Label>Habitación *</Label>
                     <Select
-  value={formData.habitacion_id || "" }
-  onValueChange={(value) => setFormData({...formData, habitacion_id: value})}
-  required
-  disabled={!formData.piso_id}
->
+                      value={formData.habitacion_id}
+                      onValueChange={(value) => setFormData({...formData, habitacion_id: value})}
+                      required
+                    >
                       <SelectTrigger data-testid="habitacion-select">
                         <SelectValue placeholder="Selecciona una habitación" />
                       </SelectTrigger>
                       <SelectContent>
-  {habitacionesFiltradas.map((hab) => (
-    <SelectItem key={hab._id} value={hab._id}>
-      {hab.nombre} ({hab.precio_base}€)
-    </SelectItem>
-  ))}
-</SelectContent>
+                        {habitaciones.map(hab => {
+                          const piso = pisos.find(p => p.id === hab.piso_id);
+                          return (
+                            <SelectItem key={hab.id} value={hab.id}>
+                              {piso?.nombre} - {hab.nombre} ({hab.precio_base}€)
+                            </SelectItem>
+                          );
+                        })}
+                      </SelectContent>
                     </Select>
                   </div>
                   <div className="col-span-2">
                     <Label>Inquilino *</Label>
                     <Select
-                      value={formData.inquilino_id || ""}
+                      value={formData.inquilino_id}
                       onValueChange={(value) => setFormData({...formData, inquilino_id: value})}
                       required
                     >
@@ -330,12 +191,12 @@ return (
                         <SelectValue placeholder="Selecciona un inquilino" />
                       </SelectTrigger>
                       <SelectContent>
-			{inquilinos.filter(i => i.activo).map(inq => (
-			<SelectItem key={inq._id} value={inq._id}>
-      {inq.nombre} - {inq.dni}
-			</SelectItem>
-		))}
-					</SelectContent>
+                        {inquilinos.filter(i => i.activo).map(inq => (
+                          <SelectItem key={inq.id} value={inq.id}>
+                            {inq.nombre} - {inq.dni}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
                     </Select>
                   </div>
                   <div>
@@ -394,77 +255,19 @@ return (
                       onChange={(e) => setFormData({...formData, gastos_mensuales_tarifa: e.target.value})}
                       required
                     />
-					<div>
-  <Label htmlFor="estado">Estado *</Label>
-  <Select
-    value={formData.estado || ""}
-    onValueChange={(value) => setFormData({ ...formData, estado: value })}
-    required
-  >
-    <SelectTrigger data-testid="estado-select">
-      <SelectValue placeholder="Selecciona estado" />
-    </SelectTrigger>
-    <SelectContent>
-      <SelectItem value="activo">Activo</SelectItem>
-      <SelectItem value="programado">Programado</SelectItem>
-      <SelectItem value="finalizado">Finalizado</SelectItem>
-    </SelectContent>
-  </Select>
-</div>
-
                   </div>
-				  <div className="col-span-2">
-
-</div>
-
-                  <div className="col-span-2 border-t pt-4">
-  <Label className="block text-sm font-medium mb-2">
-    Limpieza mensual
-  </Label>
-
-  <div className="flex items-center gap-2">
-    <input
-      type="checkbox"
-      id="limpieza"
-      checked={formData.tiene_limpieza}
-      onChange={(e) =>
-        setFormData({
-          ...formData,
-          tiene_limpieza: e.target.checked,
-          importe_limpieza_mensual: e.target.checked
-            ? formData.importe_limpieza_mensual
-            : ""
-        })
-      }
-      className="rounded"
-    />
-
-    <Label htmlFor="limpieza" className="cursor-pointer">
-      Incluye limpieza
-    </Label>
-  </div>
-
-  <div className="mt-3">
-    <Label htmlFor="importe_limpieza">
-      Cantidad limpieza mensual (€)
-    </Label>
-    <Input
-      id="importe_limpieza"
-      type="number"
-      step="0.01"
-      value={formData.importe_limpieza_mensual}
-      onChange={(e) =>
-        setFormData({
-          ...formData,
-          importe_limpieza_mensual: e.target.value
-        })
-      }
-      disabled={!formData.tiene_limpieza}
-      required={formData.tiene_limpieza}
-    />
-  </div>
-</div>
->
+                  <div className="flex items-center gap-2 pt-6">
+                    <input
+                      type="checkbox"
+                      id="limpieza"
+                      checked={formData.tiene_limpieza}
+                      onChange={(e) => setFormData({...formData, tiene_limpieza: e.target.checked})}
+                      className="rounded"
+                    />
+                    <Label htmlFor="limpieza" className="cursor-pointer">
+                      Incluye limpieza
+                    </Label>
+                  </div>
                 </div>
                 <DialogFooter className="mt-6">
                   <Button type="button" variant="outline" onClick={cerrarDialog}>
@@ -489,11 +292,10 @@ return (
                 <SelectValue placeholder="Todos" />
               </SelectTrigger>
               <SelectContent>
-  <SelectItem value="all">Todos</SelectItem>
-  <SelectItem value="activo">Activos</SelectItem>
-  <SelectItem value="programado">Programados</SelectItem>
-  <SelectItem value="finalizado">Finalizados</SelectItem>
-</SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="activo">Activos</SelectItem>
+                <SelectItem value="finalizado">Finalizados</SelectItem>
+              </SelectContent>
             </Select>
           </div>
         </CardContent>
@@ -525,30 +327,25 @@ return (
                 </TableRow>
               ) : (
                 contratos.map((contrato) => (
-                  <TableRow key={contrato._id} data-testid={`contrato-row-${contrato._id}`}>
+                  <TableRow key={contrato.id} data-testid={`contrato-row-${contrato.id}`}>
                     <TableCell className="font-medium">{obtenerNombreInquilino(contrato.inquilino_id)}</TableCell>
                     <TableCell>{obtenerNombreHabitacion(contrato.habitacion_id)}</TableCell>
                     <TableCell>{format(new Date(contrato.fecha_inicio), 'dd/MM/yyyy', { locale: es })}</TableCell>
                     <TableCell>{format(new Date(contrato.fecha_fin), 'dd/MM/yyyy', { locale: es })}</TableCell>
                     <TableCell>{contrato.renta_mensual.toFixed(2)} €</TableCell>
                     <TableCell>
-  {contrato.estado === 'activo' && (
-    <Badge className="bg-green-100 text-green-800">Activo</Badge>
-  )}
-  {contrato.estado === 'finalizado' && (
-    <Badge variant="secondary">Finalizado</Badge>
-  )}
-  {contrato.estado === 'programado' && (
-    <Badge className="bg-blue-100 text-blue-800">Programado</Badge>
-  )}
-</TableCell>
-
+                      {contrato.estado === 'activo' ? (
+                        <Badge className="bg-green-100 text-green-800">Activo</Badge>
+                      ) : (
+                        <Badge variant="secondary">Finalizado</Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => verDetalle(contrato)}
-                        data-testid={`ver-contrato-${contrato._id}`}
+                        data-testid={`ver-contrato-${contrato.id}`}
                       >
                         <Eye size={16} />
                       </Button>

@@ -27,6 +27,7 @@ function App() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="pisos" element={<Pisos />} />
             <Route path="inquilinos" element={<Inquilinos />} />
+			<Route path="habitaciones" element={<Habitaciones />} />
             <Route path="contratos" element={<Contratos />} />
             <Route path="pagos" element={<Pagos />} />
             <Route path="gastos" element={<Gastos />} />

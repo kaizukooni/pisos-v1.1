@@ -150,6 +150,20 @@ const Habitaciones = () => {
 
   const puedeEditar = usuario?.rol === 'admin' || usuario?.rol === 'supervisor';
   const puedeEliminar = usuario?.rol === 'admin';
+    const habitacionesPorPiso = habitaciones.reduce((acc, habitacion) => {
+    const pisoId = habitacion.piso_id || 'sin-piso';
+    if (!acc[pisoId]) {
+      acc[pisoId] = {
+        pisoNombre: habitacion.piso_nombre || 'Sin piso',
+        habitaciones: []
+      };
+    }
+    acc[pisoId].habitaciones.push(habitacion);
+    return acc;
+  }, {});
+  const pisosOrdenados = Object.values(habitacionesPorPiso).sort((a, b) =>
+    a.pisoNombre.localeCompare(b.pisoNombre, 'es')
+  );
 
   return (
     <div data-testid="habitaciones-page">
